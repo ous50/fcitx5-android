@@ -41,6 +41,7 @@ import splitties.views.backgroundColor
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import splitties.views.imageResource
 import timber.log.Timber
 import kotlin.time.Duration.Companion.seconds
 
@@ -58,8 +59,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val expandToolbarByDefault = AppPrefs.getInstance().keyboard.expandToolbarByDefault
 
     private var clipboardTimeoutJob: Job? = null
-
-    private var firstShow = true
 
     private val onClipboardUpdateListener =
         ClipboardManager.OnClipboardUpdateListener {
@@ -94,38 +93,39 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private val idleUi: KawaiiBarUi.Idle by lazy {
-        KawaiiBarUi.Idle(context, theme) { idleUiStateMachine.currentState }.also {
-            it.menuButton.setOnClickListener {
+        KawaiiBarUi.Idle(context, theme) { idleUiStateMachine.currentState }.apply {
+            menuButton.setOnClickListener {
                 idleUiStateMachine.push(MenuButtonClicked)
                 // reset timeout timer (if present) when user switch layout
                 if (clipboardTimeoutJob != null) {
                     launchClipboardTimeoutJob()
                 }
             }
-            it.undoButton.setOnClickListener {
+            undoButton.setOnClickListener {
                 service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
             }
-            it.redoButton.setOnClickListener {
+            redoButton.setOnClickListener {
                 service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true)
             }
-            it.cursorMoveButton.setOnClickListener {
+            cursorMoveButton.setOnClickListener {
                 windowManager.attachWindow(TextEditingWindow())
             }
-            it.clipboardButton.setOnClickListener {
+            clipboardButton.setOnClickListener {
                 windowManager.attachWindow(ClipboardWindow())
             }
-            it.moreButton.setOnClickListener {
+            moreButton.setOnClickListener {
                 windowManager.attachWindow(StatusAreaWindow())
             }
-            it.clipboardSuggestionItem.setOnClickListener {
+            clipboardSuggestionItem.setOnClickListener {
                 service.inputConnection?.performContextMenuAction(android.R.id.paste)
                 clipboardTimeoutJob?.cancel()
                 clipboardTimeoutJob = null
                 idleUiStateMachine.push(Pasted)
             }
-            it.hideKeyboardButton.setOnClickListener {
+            hideKeyboardButton.setOnClickListener {
                 service.requestHideSelf(0)
             }
+            switchUiByState(idleUiStateMachine.currentState)
         }
     }
 
@@ -169,7 +169,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 }
             )
         }
-        candidateUi.expandButton.imageResource = R.drawable.ic_baseline_expand_more_24
+        candidateUi.expandButton.image.imageResource = R.drawable.ic_baseline_expand_more_24
     }
 
     // set expand candidate button to close expand candidate
@@ -177,7 +177,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         candidateUi.expandButton.setOnClickListener {
             windowManager.switchToKeyboardWindow()
         }
-        candidateUi.expandButton.imageResource = R.drawable.ic_baseline_expand_less_24
+        candidateUi.expandButton.image.imageResource = R.drawable.ic_baseline_expand_less_24
     }
 
     // should be used with setExpandButtonToAttach or setExpandButtonToDetach
@@ -189,17 +189,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     fun onShow() {
-        idleUiStateMachine.push(KawaiiBarShown)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             idleUi.privateMode(
                 service.editorInfo?.imeOptions?.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) == true
             )
         }
-        if (firstShow) {
-            if (expandToolbarByDefault.getValue())
-                idleUi.switchUiByState(IdleUiStateMachine.State.Toolbar)
-            firstShow = false
-        }
+        idleUiStateMachine.push(KawaiiBarShown)
     }
 
     private fun switchUiByState(state: KawaiiBarStateMachine.State) {
